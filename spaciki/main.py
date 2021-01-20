@@ -1,15 +1,12 @@
 import pdb
-from os.path import join
+from os.path import abspath, dirname, join
 
 import spacy
-from spaciki import APP_DIR
 from spacy.matcher import Matcher, PhraseMatcher
 from spacy.tokens import Doc, Span, Token
 
 from .patterns import patterns
 from .utils import merge_matches
-
-DATA = join(APP_DIR, 'data/brand_name.txt')
 
 
 class attrs:
@@ -25,20 +22,32 @@ class attrs:
     _attributes = 'attributes'
     _has_attributes = 'has_attributes'
 
+    _is_quantity = 'is_quantity'
+    _quantity = 'quantity'
+    _has_quantity = 'has_quantity'
+
+    _is_clothes_size = 'is_clothes_size'
+    _clothes_size = 'clothes_size'
+    _has_clothes_size = 'has_clothes_size'
+
     _dict = {
         'MODEL_TYPE': _is_model_type,
-        'ATTRIBUTES': _is_attributes
+        'ATTRIBUTES': _is_attributes,
+        'QUANTITY': _is_quantity,
+        'CLOTHES_SIZE': _is_clothes_size
     }
 
 
 class Spaciki:
+
+    _ATTRS = ['brand', 'model_type', 'attributes', 'quantity', 'clothes_size']
 
     def __init__(self, nlp, force_extension=True):
         self.brand_matcher = PhraseMatcher(nlp.vocab, attr='LOWER')
         phrases_doc = [nlp.make_doc(doc) for doc in self._load_phrases()]
         self.brand_matcher.add('BRAND', None, *phrases_doc)
 
-        for typ in ['brand', 'model_type', 'attributes']:
+        for typ in self._ATTRS:
             Doc.set_extension(getattr(attrs, f'_has_{typ}'),
                               getter=getattr(self, f'has_{typ}'),
                               force=force_extension)
@@ -59,7 +68,8 @@ class Spaciki:
             self.matcher.add(name, None, pattern)
 
     def _load_phrases(self):
-        with open(DATA, 'r') as f:
+        path = join(abspath(dirname(__file__)), 'data/brand_name.txt')
+        with open(path, 'r') as f:
             phrases = f.read().split('\n')
         return phrases
 
@@ -105,6 +115,18 @@ class Spaciki:
     def iter_attributes(self, tokens):
         return self.iter_(tokens, attrs._is_attributes)
 
+    def has_quantity(self, tokens):
+        return self.has_(tokens, attrs._is_quantity)
+
+    def iter_quantity(self, tokens):
+        return self.iter_(tokens, attrs._is_quantity)
+
+    def has_clothes_size(self, tokens):
+        return self.has_(tokens, attrs._is_clothes_size)
+
+    def iter_clothes_size(self, tokens):
+        return self.iter_(tokens, attrs._is_clothes_size)
+
     @staticmethod
     def has_(tokens, attrs_name):
         return any(token._.get(attrs_name) for token in tokens)
@@ -121,6 +143,5 @@ if __name__ == '__main__':
     doc = spaciki(nlp.make_doc("Bộ Chữ Số Nam Châm Cho Bé 123 Antona"))
     print(doc._.brand)
 
-    doc = spaciki(nlp.make_doc("Sáp thơm cà phê mocha Grasse LEsterel Bullsone 130g"))
-    # pdb.set_trace()
+    doc = spaciki(nlp.make_doc("Sáp mocha 30L Grasse LEsterel Bullsone 130g"))
     print(doc._.brand, doc._.model_type, doc._.attributes)
